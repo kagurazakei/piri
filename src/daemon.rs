@@ -9,7 +9,7 @@ use crate::commands::CommandHandler;
 use crate::ipc::{handle_request, IpcServer};
 use crate::niri::NiriIpc;
 use crate::plugins::PluginManager;
-use crate::utils::send_notification;
+use crate::utils::{send_notification, Debounce};
 use niri_ipc::Event;
 use tokio::sync::mpsc;
 
@@ -39,54 +39,39 @@ async fn start_config_watcher(
     tokio::spawn(async move {
         // Keep watcher alive
         let _watcher = watcher;
+        let mut debouncer = Debounce::new();
 
-        loop {
-            // Wait for first event
-            if rx.recv().await.is_none() {
-                break;
-            }
+        while let Some(_) = rx.recv().await {
+            let handler = handler.clone();
+            let plugin_manager = plugin_manager.clone();
+            let niri = niri.clone();
 
-            // Debounce: wait for 300ms, if new events arrive, reset the timer
-            let debounce_timer = tokio::time::sleep(tokio::time::Duration::from_millis(300));
-            tokio::pin!(debounce_timer);
-            loop {
-                tokio::select! {
-                    _ = debounce_timer.as_mut() => {
-                        // No new events during debounce period, proceed with reload
-                        break;
-                    }
-                    result = rx.recv() => {
-                        if result.is_none() {
-                            // Channel closed
-                            return;
+            debouncer.debounce(
+                tokio::time::Duration::from_millis(300),
+                move || async move {
+                    info!("Config file modified, reloading...");
+
+                    let mut h = handler.lock().await;
+                    let path = h.config_path().clone();
+                    if let Err(e) = h.reload_config(&path).await {
+                        error!("Failed to auto-reload config: {}", e);
+                        send_notification("piri", &format!("Auto-reload failed: {}", e));
+                    } else {
+                        let config = h.config().clone();
+                        // Update existing NiriIpc instance in case socket_path changed
+                        niri.update_socket_path(config.niri.socket_path.clone());
+
+                        let mut pm = plugin_manager.lock().await;
+                        if let Err(e) = pm.init(niri.clone(), &config).await {
+                            error!("Failed to reinitialize plugins after auto-reload: {}", e);
+                            send_notification("piri", &format!("Plugin reinit failed: {}", e));
+                        } else {
+                            info!("Config auto-reloaded successfully");
+                            send_notification("piri", "Configuration hot-reloaded successfully");
                         }
-                        // New event arrived, reset debounce timer
-                        debounce_timer.set(tokio::time::sleep(tokio::time::Duration::from_millis(300)));
                     }
-                }
-            }
-
-            info!("Config file modified, reloading...");
-
-            let mut h = handler.lock().await;
-            let path = h.config_path().clone();
-            if let Err(e) = h.reload_config(&path).await {
-                error!("Failed to auto-reload config: {}", e);
-                send_notification("piri", &format!("Auto-reload failed: {}", e));
-            } else {
-                let config = h.config().clone();
-                // Update existing NiriIpc instance in case socket_path changed
-                niri.update_socket_path(config.niri.socket_path.clone());
-
-                let mut pm = plugin_manager.lock().await;
-                if let Err(e) = pm.init(niri.clone(), &config).await {
-                    error!("Failed to reinitialize plugins after auto-reload: {}", e);
-                    send_notification("piri", &format!("Plugin reinit failed: {}", e));
-                } else {
-                    info!("Config auto-reloaded successfully");
-                    send_notification("piri", "Configuration hot-reloaded successfully");
-                }
-            }
+                },
+            );
         }
     });
 

@@ -111,9 +111,9 @@ window-rule {
 }
 ```
 
-**Method 2: Use autofill functionality**
+**Method 2: Use workspace_rule functionality**
 
-Enable the piri autofill plugin to automatically handle the layout of these windows.
+Enable the piri workspace_rule plugin and configure `auto_fill = true` to automatically handle the layout of these windows.
 
 ## Examples
 
@@ -232,6 +232,19 @@ The plugin maintains a focus queue of at most 5 windows to track recently focuse
 - When a child window opens and the currently focused window is the child window itself, the plugin searches for a matching parent window from the queue (newest to oldest)
 - The queue size is limited to 5, removing the oldest window ID when exceeded
 
+### Floating Window Handling
+
+The plugin intelligently handles floating window state changes:
+
+- **Floating Windows Skip Swallowing**: If a window is currently floating, the plugin will skip the swallow operation (since swallowing only works for tiled windows)
+- **Floating State Tracking**: The plugin tracks the floating state of each window (`window_floating_state`) to detect state changes
+- **Re-attempt on Float-to-Tile Conversion**: When a window changes from floating to tiled state, even if the window is already in the PID map, the plugin will re-attempt the swallow operation
+- **State Change Detection**: State changes are detected by comparing `previous_floating` and `current_floating`
+  - If `previous_floating == Some(true)` and `current_floating == false`, it indicates the window changed from floating to tiled
+  - In this case, even if the window ID is already in the map, swallowing will be re-attempted
+
+This mechanism ensures that when a child window initially opens as floating and then converts to tiled, the swallow operation can be correctly executed.
+
 ### Window Matching
 
 The plugin uses the same window matching mechanism as other plugins. For details, see [Window Matching Mechanism](../window_matching.md).
@@ -257,7 +270,8 @@ All operations are performed in a single batch for better performance and atomic
 
 ## Limitations
 
-- Floating windows cannot be swallowed (will be converted to tiling first)
+- Floating windows cannot be swallowed (plugin will skip swallow operations for floating windows)
+- When a window changes from floating to tiled, the plugin will re-attempt swallowing (even if the window is already in the map)
 - Parent and child windows must be in the same workspace (plugin handles this automatically)
 - Process tree tracing goes all the way up to PID 1, which may impact performance if the process tree is very deep
 - PID matching requires processes to have a parent-child relationship

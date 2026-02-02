@@ -1,4 +1,3 @@
-pub mod autofill;
 pub mod empty;
 pub mod scratchpads;
 pub mod singleton;
@@ -6,6 +5,7 @@ pub mod swallow;
 pub mod window_order;
 pub mod window_rule;
 pub mod window_utils;
+pub mod workspace_rule;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -139,8 +139,8 @@ register_plugins! {
     "scratchpads"  => Scratchpads(scratchpads::ScratchpadsPlugin),
     "singleton"    => Singleton(singleton::SingletonPlugin),
     "window_order" => WindowOrder(window_order::WindowOrderPlugin),
-    "autofill"     => Autofill(autofill::AutofillPlugin),
     "swallow"      => Swallow(swallow::SwallowPlugin),
+    "workspace_rule" => WorkspaceRule(workspace_rule::WorkspaceRulePlugin),
 }
 
 pub struct PluginManager {

@@ -11,7 +11,7 @@ Piri is a high-performance [Niri](https://github.com/YaLTeR/niri) extension tool
 - 📦 **Scratchpads**: Intelligent hide/show windows. Supports auto-capturing existing windows or launching on-demand, following you seamlessly across workspaces and monitors (see [Scratchpads Docs](docs/en/plugins/scratchpads.md))
 - 🔌 **Empty**: Automation for empty workspaces. Automatically triggers preset commands when switching to an empty workspace to get you into the flow faster (see [Empty Docs](docs/en/plugins/empty.md))
 - 🎯 **Window Rule**: Powerful rule engine. Automatically places windows based on regex matching and provides focus-triggered command execution with a built-in de-duplication mechanism (see [Window Rule Docs](docs/en/plugins/window_rule.md))
-- 🔄 **Autofill**: Layout auto-alignment. Automatically aligns remaining windows when a window is closed or layout changes, keeping your interface clean (see [Autofill Docs](docs/en/plugins/autofill.md))
+- 📐 **Workspace Rule**: Workspace window layout management. Provides automatic width adjustment, automatic tiling, automatic alignment, and automatic maximization. Integrates original Autofill functionality (see [Workspace Rule Docs](docs/en/plugins/workspace_rule.md))
 - 🔒 **Singleton**: Single-instance assurance. Ensures specific applications remain globally unique, supporting quick focus or automatic process launching (see [Singleton Docs](docs/en/plugins/singleton.md))
 - 📋 **Window Order**: Intelligent reordering. Automatically reorders tiled windows based on configured weights, preserving relative positions for identical weights to minimize movement (see [Window Order Docs](docs/en/plugins/window_order.md))
 - 🍽️ **Swallow**: Window swallowing mechanism. Automatically hides parent windows when child windows are opened, allowing child windows to replace parent windows in the layout (see [Swallow Docs](docs/en/plugins/swallow.md))
@@ -238,25 +238,55 @@ open_on_workspace = "browser"
 
 For detailed documentation, please refer to the [Window Rule documentation](docs/en/plugins/window_rule.md).
 
-### Autofill
+### Workspace Rule
 
-![Autofill](./assets/autofill.mp4)
+![Workspace Rule](./assets/autofill.mp4)
 
-Automatically aligns the last column of windows to the rightmost position when windows are closed or layout changes, maintaining a clean and organized window layout.
+Workspace window layout management plugin that provides automatic width adjustment, automatic tiling, automatic alignment, and automatic maximization. Integrates the original Autofill plugin functionality, providing comprehensive workspace window management capabilities.
 
 **Configuration Example**:
 ```toml
 [piri.plugins]
-autofill = true
+workspace_rule = true
+
+# Default configuration (applies to all workspaces)
+[piri.workspace_rule]
+auto_width = ["100%", "50%", "33.33%", "25%", "20%"]
+auto_fill = true  # Automatic alignment (original Autofill functionality)
+auto_maximize = true  # Automatic maximization
+
+# Workspace-specific configuration
+[workspace_rule.main]
+auto_maximize = true
+
+[workspace_rule.dev]
+auto_width = ["100%", ["45%", "55%"], ["30%", "35%", "35%"]]
+auto_tile = true  # Automatic tiling
 ```
 
 **Features**:
-- Zero configuration required
-- Pure event-driven, real-time response
-- Workspace-aware, only affects the current workspace
-- Automatically maintains clean window layouts
+- Automatic width adjustment: Automatically adjust window widths based on window count
+- Automatic tiling: Automatically merge new windows into existing columns
+- Automatic alignment: Automatically align to rightmost position after closing windows (original Autofill functionality)
+- Automatic maximization: Automatically maximize when only one window, unmaximize when multiple windows
+- Workspace-aware: Each workspace can be configured independently
+- Flexible configuration: Supports default and workspace-specific configuration
 
-For detailed documentation, please refer to the [Autofill documentation](docs/en/plugins/autofill.md).
+**Migration from Autofill**:
+```toml
+# Old configuration
+[piri.plugins]
+autofill = true
+
+# New configuration
+[piri.plugins]
+workspace_rule = true
+
+[piri.workspace_rule]
+auto_fill = true  # Enable original Autofill functionality
+```
+
+For detailed documentation, please refer to the [Workspace Rule documentation](docs/en/plugins/workspace_rule.md).
 
 ### Singleton
 
@@ -369,6 +399,7 @@ child_app_id = [".*preview.*", ".*markdown.*"]
 - Supports global and rule-level exclude rules
 - Intelligent focus window queue for automatic parent window discovery
 - Automatically handles workspace movement and floating window conversion
+- Smart floating window handling: Floating windows are not swallowed, but re-attempts swallowing when converting from floating to tiled
 
 For detailed documentation, please refer to the [Swallow documentation](docs/en/plugins/swallow.md).
 

@@ -1,9 +1,9 @@
 use anyhow::Result;
-use log::info;
+use log::{debug, info};
 use niri_ipc::Event;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,7 @@ use crate::config::{Config, WindowRuleConfig};
 use crate::niri::NiriIpc;
 use crate::plugins::window_utils::{self, WindowMatcher, WindowMatcherCache};
 use crate::plugins::FromConfig;
+use crate::utils::Throttle;
 
 /// Window rule plugin config (for internal use)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,10 +46,14 @@ pub struct WindowRulePlugin {
     matcher_cache: Arc<WindowMatcherCache>,
     /// Last window ID that triggered focus command
     last_focused_window: Option<u64>,
-    /// Last time a focus command was executed
-    last_execution_time: Option<Instant>,
+    /// Throttle for focus command execution
+    execution_throttle: Throttle,
     /// Set of rule indices that have already executed focus_command (when focus_command_once is true)
     executed_rules: HashSet<usize>,
+    /// Last window ID that was processed by handle_focus_command (for throttling)
+    last_handled_window: Option<u64>,
+    /// Throttle for handle_focus_command
+    handle_throttle: Throttle,
 }
 
 impl WindowRulePlugin {
@@ -65,38 +70,53 @@ impl WindowRulePlugin {
             return Ok(());
         }
 
-        let now = Instant::now();
-        if let (Some(last_id), Some(last_time)) =
-            (self.last_focused_window, self.last_execution_time)
-        {
-            if last_id == window_id && now.duration_since(last_time) < Duration::from_millis(200) {
-                return Ok(());
+        // Global throttle: prevent executing focus_command too frequently regardless of window ID
+        if self.execution_throttle.check_and_update(Duration::from_millis(200)) {
+            info!(
+                "Executing focus_command for window {}: {}",
+                window_id, focus_command
+            );
+            window_utils::execute_command(focus_command)?;
+
+            // Mark this rule as having executed focus_command if focus_once is true
+            if focus_once {
+                self.executed_rules.insert(rule_index);
             }
+
+            self.last_focused_window = Some(window_id);
         }
 
-        info!(
-            "Executing focus_command for window {}: {}",
-            window_id, focus_command
-        );
-        window_utils::execute_command(focus_command)?;
-
-        // Mark this rule as having executed focus_command if focus_once is true
-        if focus_once {
-            self.executed_rules.insert(rule_index);
-        }
-
-        self.last_focused_window = Some(window_id);
-        self.last_execution_time = Some(now);
         Ok(())
     }
 
     /// Handle focus command execution for currently focused window
     async fn handle_focus_command(&mut self, window_id: u64) -> Result<()> {
+        // Check if this is a programmatic focus change (e.g., from auto_fill)
+        if window_utils::should_ignore_focus_change().await {
+            debug!(
+                "Ignoring programmatic focus change for window {}",
+                window_id
+            );
+            return Ok(());
+        }
+
+        // Global throttle: prevent processing focus changes too frequently
+        if !self.handle_throttle.check_and_update(Duration::from_millis(200)) {
+            return Ok(());
+        }
+
+        // Update tracking before processing
+        self.last_handled_window = Some(window_id);
+
         let windows = self.niri.get_windows().await?;
-        let window = windows
-            .into_iter()
-            .find(|w| w.id == window_id)
-            .ok_or_else(|| anyhow::anyhow!("Focused window {} not found", window_id))?;
+        let window = match windows.into_iter().find(|w| w.id == window_id) {
+            Some(w) => w,
+            None => {
+                // Window not found - this is normal when a window is closing or has just closed
+                // Silently return instead of erroring
+                return Ok(());
+            }
+        };
 
         let rules = self.config.rules.clone();
         for (rule_index, rule) in rules.iter().enumerate() {
@@ -186,8 +206,10 @@ impl crate::plugins::Plugin for WindowRulePlugin {
             config,
             matcher_cache: Arc::new(WindowMatcherCache::new()),
             last_focused_window: None,
-            last_execution_time: None,
+            execution_throttle: Throttle::new(),
             executed_rules: HashSet::new(),
+            last_handled_window: None,
+            handle_throttle: Throttle::new(),
         }
     }
 

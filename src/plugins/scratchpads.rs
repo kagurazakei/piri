@@ -178,8 +178,14 @@ impl ScratchpadManager {
                                 "Swallowing scratchpad window {} to focused window {}",
                                 window_id, parent_window.id
                             );
-                            perform_swallow(&self.niri, &parent_window, &child_window, window_id)
-                                .await?;
+                            perform_swallow(
+                                &self.niri,
+                                &parent_window,
+                                &child_window,
+                                window_id,
+                                niri_ipc::ColumnDisplay::Tabbed,
+                            )
+                            .await?;
                             return Ok(());
                         } else {
                             debug!(

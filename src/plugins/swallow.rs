@@ -75,6 +75,8 @@ pub struct SwallowPlugin {
     matcher_cache: Arc<WindowMatcherCache>,
     window_pid_map: Arc<Mutex<HashMap<u32, Vec<u64>>>>,
     focused_window_queue: VecDeque<u64>,
+    /// Track window floating state to detect float status changes
+    window_floating_state: HashMap<u64, bool>,
 }
 
 impl SwallowPlugin {
@@ -103,6 +105,7 @@ impl SwallowPlugin {
             matcher_cache: Arc::new(WindowMatcherCache::new()),
             window_pid_map,
             focused_window_queue: VecDeque::with_capacity(5),
+            window_floating_state: HashMap::new(),
         }
     }
 
@@ -333,13 +336,28 @@ impl SwallowPlugin {
 
     async fn handle_window_opened(&mut self, window: &niri_ipc::Window) -> Result<()> {
         let window_id = window.id;
+        let current_floating = window.is_floating;
+        let previous_floating = self.window_floating_state.get(&window_id).copied();
 
-        // If ID is already in the map, it's a Changed event, skip it.
-        let should_skip = {
+        // Update floating state tracking
+        self.window_floating_state.insert(window_id, current_floating);
+
+        // Check if window changed from float to tiled
+        let changed_from_float_to_tiled = previous_floating == Some(true) && !current_floating;
+
+        // If window is floating, skip swallow (swallow only works for tiled windows)
+        if current_floating {
+            debug!("Window {} is floating, skipping swallow", window_id);
+            return Ok(());
+        }
+
+        // If ID is already in the map and not changing from float to tiled, it's a Changed event, skip it.
+        // When window changes from float to tiled, we allow re-trying swallow even if it's in the map.
+        let is_in_map = {
             let map = self.window_pid_map.lock().await;
             map.values().any(|window_ids| window_ids.contains(&window_id))
         };
-        if should_skip {
+        if is_in_map && !changed_from_float_to_tiled {
             debug!(
                 "Window {} already in map, skipping (Changed event)",
                 window_id
@@ -399,7 +417,14 @@ impl SwallowPlugin {
             if let Some(parent_window) =
                 try_pid_matching(&child_window, &windows, self.window_pid_map.clone()).await?
             {
-                perform_swallow(&self.niri, &parent_window, &child_window, window_id).await?;
+                perform_swallow(
+                    &self.niri,
+                    &parent_window,
+                    &child_window,
+                    window_id,
+                    niri_ipc::ColumnDisplay::Tabbed,
+                )
+                .await?;
                 return Ok(());
             }
             debug!(
@@ -439,7 +464,14 @@ impl SwallowPlugin {
                         "Found matching parent window {} for rule {}, performing swallow",
                         parent_window.id, rule_idx
                     );
-                    perform_swallow(&self.niri, &parent_window, &child_window, window_id).await?;
+                    perform_swallow(
+                        &self.niri,
+                        &parent_window,
+                        &child_window,
+                        window_id,
+                        niri_ipc::ColumnDisplay::Tabbed,
+                    )
+                    .await?;
                     return Ok(()); // Only apply first matching rule
                 }
                 None => {
@@ -504,6 +536,9 @@ impl crate::plugins::Plugin for SwallowPlugin {
 
                 // Remove window id from focused window queue
                 self.focused_window_queue.retain(|&window_id| window_id != *id);
+
+                // Remove window floating state tracking
+                self.window_floating_state.remove(id);
             }
             Event::WindowFocusTimestampChanged { id, .. } => {
                 // Add new focused window to queue

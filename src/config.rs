@@ -78,6 +78,8 @@ pub struct Config {
     pub window_order: HashMap<String, u32>,
     #[serde(default)]
     pub swallow: Vec<crate::plugins::swallow::SwallowRule>,
+    #[serde(default)]
+    pub workspace_rule: HashMap<String, WorkspaceRuleConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +148,8 @@ pub struct PiriConfig {
     pub window_order: WindowOrderSection,
     #[serde(default)]
     pub swallow: SwallowSection,
+    #[serde(default)]
+    pub workspace_rule: WorkspaceRuleSection,
 }
 
 impl Default for PiriConfig {
@@ -155,6 +159,7 @@ impl Default for PiriConfig {
             plugins: PluginsConfig::default(),
             window_order: WindowOrderSection::default(),
             swallow: SwallowSection::default(),
+            workspace_rule: WorkspaceRuleSection::default(),
         }
     }
 }
@@ -175,6 +180,8 @@ pub struct PluginsConfig {
     pub window_order: Option<bool>,
     #[serde(default)]
     pub swallow: Option<bool>,
+    #[serde(default)]
+    pub workspace_rule: Option<bool>,
     #[serde(rename = "empty_config", default)]
     pub empty_config: Option<EmptyPluginConfig>,
 }
@@ -189,6 +196,7 @@ impl Default for PluginsConfig {
             singleton: None,
             window_order: None,
             swallow: None,
+            workspace_rule: None,
             empty_config: None,
         }
     }
@@ -367,10 +375,10 @@ impl PluginsConfig {
             "scratchpads" => self.scratchpads.unwrap_or(false),
             "empty" => self.empty.unwrap_or(false),
             "window_rule" => self.window_rule.unwrap_or(false),
-            "autofill" => self.autofill.unwrap_or(false),
             "singleton" => self.singleton.unwrap_or(false),
             "window_order" => self.window_order.unwrap_or(false),
             "swallow" => self.swallow.unwrap_or(false),
+            "workspace_rule" => self.workspace_rule.unwrap_or(false),
             _ => false,
         }
     }
@@ -384,6 +392,91 @@ fn default_window_order_weight() -> u32 {
     0 // Default: unconfigured windows have weight 0 (rightmost)
 }
 
+/// Helper type to deserialize String or Vec<String> for auto_width
+/// This allows both "50%" and ["45%", "55%"] formats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum WidthValue {
+    String(String),
+    Vec(Vec<String>),
+}
+
+impl WidthValue {
+    /// Convert to Vec<String>, expanding single string to vec
+    fn into_vec(self) -> Vec<String> {
+        match self {
+            WidthValue::String(s) => vec![s],
+            WidthValue::Vec(v) => v,
+        }
+    }
+}
+
+/// Custom deserializer for auto_width array
+/// Handles nested arrays: ["100%", "50%"] or ["100%", ["45%", "55%"]]
+fn deserialize_auto_width<'de, D>(deserializer: D) -> Result<Vec<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::Deserialize;
+
+    // Deserialize as Vec<WidthValue>
+    let values: Vec<WidthValue> = Vec::deserialize(deserializer)?;
+
+    // Convert each element to Vec<String>
+    let result: Vec<Vec<String>> = values.into_iter().map(|v| v.into_vec()).collect();
+
+    Ok(result)
+}
+
+/// Workspace rule configuration for a specific workspace
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceRuleConfig {
+    /// Auto width configuration: array where index corresponds to window count (1-based)
+    /// Each element can be a string (all windows same width) or array (different widths per window)
+    /// Examples:
+    ///   ["100%", "50%"] - 1 window: 100%, 2 windows: each 50%
+    ///   ["100%", ["45%", "55%"]] - 1 window: 100%, 2 windows: 45% and 55%
+    #[serde(deserialize_with = "deserialize_auto_width")]
+    pub auto_width: Vec<Vec<String>>,
+    /// If true, automatically tile windows: allow up to 2 windows per column (except first column)
+    #[serde(default)]
+    pub auto_tile: bool,
+    /// If true, automatically align last column (autofill)
+    #[serde(default, rename = "auto_fill")]
+    pub auto_fill: bool,
+    /// If true, automatically maximize window when there's only one window, and unmaximize when there are multiple windows
+    #[serde(default)]
+    pub auto_maximize: bool,
+}
+
+/// Workspace rule section in piri config (default settings)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceRuleSection {
+    /// Default auto width configuration
+    #[serde(deserialize_with = "deserialize_auto_width", default)]
+    pub auto_width: Vec<Vec<String>>,
+    /// If true, automatically tile windows: allow up to 2 windows per column (except first column)
+    #[serde(default)]
+    pub auto_tile: bool,
+    /// If true, automatically align last column (autofill)
+    #[serde(default, rename = "auto_fill")]
+    pub auto_fill: bool,
+    /// If true, automatically maximize window when there's only one window, and unmaximize when there are multiple windows
+    #[serde(default)]
+    pub auto_maximize: bool,
+}
+
+impl Default for WorkspaceRuleSection {
+    fn default() -> Self {
+        Self {
+            auto_width: Vec::new(),
+            auto_tile: false,
+            auto_fill: false,
+            auto_maximize: false,
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -395,6 +488,7 @@ impl Default for Config {
             window_rule: Vec::new(),
             window_order: HashMap::new(),
             swallow: Vec::new(),
+            workspace_rule: HashMap::new(),
         }
     }
 }

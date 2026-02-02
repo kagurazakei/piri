@@ -4,13 +4,43 @@ use niri_ipc::{Action, ColumnDisplay, Reply, Request, WorkspaceReferenceArg};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+use std::time::Instant;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 use crate::config::Direction;
 use crate::niri::NiriIpc;
 use crate::niri::Window;
+
+/// Shared state to track programmatic focus changes (e.g., from auto_fill)
+/// This prevents window_rule from executing focus_command during programmatic operations
+static PROGRAMMATIC_FOCUS_TIME: OnceLock<Arc<Mutex<Option<Instant>>>> = OnceLock::new();
+
+fn get_programmatic_focus_time() -> Arc<Mutex<Option<Instant>>> {
+    PROGRAMMATIC_FOCUS_TIME.get_or_init(|| Arc::new(Mutex::new(None))).clone()
+}
+
+/// Mark that a programmatic focus change is starting
+/// Focus changes within PROGRAMMATIC_FOCUS_WINDOW_MS will be ignored by window_rule
+pub async fn mark_programmatic_focus_start() {
+    let time = get_programmatic_focus_time();
+    let mut guard = time.lock().await;
+    *guard = Some(Instant::now());
+}
+
+/// Check if a focus change should be ignored (happened during programmatic operation)
+pub async fn should_ignore_focus_change() -> bool {
+    const PROGRAMMATIC_FOCUS_WINDOW_MS: u64 = 500;
+    let time = get_programmatic_focus_time();
+    let guard = time.lock().await;
+    if let Some(start_time) = *guard {
+        if start_time.elapsed().as_millis() < PROGRAMMATIC_FOCUS_WINDOW_MS as u128 {
+            return true;
+        }
+    }
+    false
+}
 
 /// Execute a shell command (generic function for all plugins)
 /// This function spawns a command in the background without waiting for completion
@@ -563,6 +593,7 @@ pub async fn perform_swallow(
     parent_window: &Window,
     child_window: &Window,
     child_window_id: u64,
+    column_display: ColumnDisplay,
 ) -> Result<()> {
     // Prepare workspace reference if needed
     let workspace_ref = if let Some(workspace_id) = parent_window.workspace_id {
@@ -594,9 +625,9 @@ pub async fn perform_swallow(
             Reply::Err(err) => anyhow::bail!("Failed to focus parent window: {}", err),
         }
 
-        // 2. Set column display to tabbed (to ensure swallowing into a column works as expected)
+        // 2. Set column display (Tabbed or Normal)
         let _ = socket.send(Request::Action(Action::SetColumnDisplay {
-            display: ColumnDisplay::Tabbed,
+            display: column_display,
         }))?;
 
         // 3. Ensure child window is not floating (floating windows cannot be swallowed into columns)
