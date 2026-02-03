@@ -254,7 +254,21 @@ impl WorkspaceRulePlugin {
         // 1. Filter tiled windows in current workspace
         let ws_windows = Self::filter_tiled_windows_in_workspace(&windows, ws_name);
 
-        // 2. Handle auto_maximize: maximize when only one window, unmaximize when multiple windows
+        // 2. Group windows by column (one window ID per column is enough)
+        // Calculate columns early for use throughout the function
+        let columns: HashMap<usize, u64> = ws_windows
+            .iter()
+            .filter_map(|w| {
+                w.layout
+                    .as_ref()
+                    .and_then(|l| l.pos_in_scrolling_layout)
+                    .map(|(col, _)| (col, w.id))
+            })
+            .collect();
+
+        let column_count = columns.len();
+
+        // 3. Handle auto_maximize: maximize when only one window, unmaximize when multiple windows
         if self.get_auto_maximize(ws_name) {
             match ws_windows.len() {
                 0 => return Ok(()), // No windows, nothing to do
@@ -285,31 +299,48 @@ impl WorkspaceRulePlugin {
                     return Ok(());
                 }
                 _ => {
-                    // Multiple windows: remove maximized tracking (width adjustment will handle)
-                    for window in &ws_windows {
-                        if self.maximized_windows.remove(&window.id) {
-                            info!(
-                                "Auto-maximize: unmaximizing window {} (multiple windows)",
-                                window.id
-                            );
+                    // Multiple windows: check if auto_width is configured
+                    let auto_width = self.get_auto_width(ws_name);
+                    let has_width_config = column_count > 0
+                        && column_count <= 5
+                        && auto_width.get(column_count.saturating_sub(1)).is_some();
+
+                    if !has_width_config {
+                        // No auto_width config: unmaximize all maximized windows
+                        for window in &ws_windows {
+                            if self.maximized_windows.remove(&window.id) {
+                                info!(
+                                    "Auto-maximize: unmaximizing window {} (multiple windows, no auto_width)",
+                                    window.id
+                                );
+                                // Cancel maximize by toggling (MaximizeWindowToEdges is a toggle)
+                                self.niri
+                                    .send_action(Action::MaximizeWindowToEdges {
+                                        id: Some(window.id),
+                                    })
+                                    .await
+                                    .map_err(|e| {
+                                        warn!("Failed to unmaximize window {}: {}", window.id, e)
+                                    })
+                                    .ok();
+                            }
+                        }
+                        return Ok(());
+                    } else {
+                        // Has auto_width config: remove maximized tracking (width adjustment will handle)
+                        for window in &ws_windows {
+                            if self.maximized_windows.remove(&window.id) {
+                                info!(
+                                    "Auto-maximize: unmaximizing window {} (multiple windows, has auto_width)",
+                                    window.id
+                                );
+                            }
                         }
                     }
                 }
             }
         }
 
-        // 3. Group windows by column (one window ID per column is enough)
-        let columns: HashMap<usize, u64> = ws_windows
-            .iter()
-            .filter_map(|w| {
-                w.layout
-                    .as_ref()
-                    .and_then(|l| l.pos_in_scrolling_layout)
-                    .map(|(col, _)| (col, w.id))
-            })
-            .collect();
-
-        let column_count = columns.len();
         if column_count == 0 || column_count > 5 {
             return Ok(());
         }
@@ -408,7 +439,10 @@ impl WorkspaceRulePlugin {
 
         self.window_floating_state.insert(window.id, window.is_floating);
 
-        // 判断是否需要处理
+        // Get workspace name early for auto_fill execution at the end
+        let current_ws = self.niri.get_focused_workspace().await?;
+        let ws_name = &current_ws.name;
+
         let is_new_tiled = is_new && !window.is_floating;
         let needs_adjustment = is_new_tiled || floating_changed;
 
@@ -416,16 +450,14 @@ impl WorkspaceRulePlugin {
             self.seen_windows.insert(window.id);
             if window.is_floating {
                 debug!("New floating window: {}", window.id);
-                return Ok(());
+                // Will execute auto_fill at the end
+            } else {
+                debug!("New tiled window: {}", window.id);
             }
-            debug!("New tiled window: {}", window.id);
         } else if !needs_adjustment {
             debug!("Window {} changed (no action needed)", window.id);
-            return Ok(());
+            // Will execute auto_fill at the end
         }
-
-        let current_ws = self.niri.get_focused_workspace().await?;
-        let ws_name = &current_ws.name;
 
         if is_new_tiled {
             let windows = self.niri.get_windows().await?;
@@ -438,18 +470,11 @@ impl WorkspaceRulePlugin {
         }
 
         if needs_adjustment {
-            if floating_changed {
-                let status = if window.is_floating {
-                    "tiled->float"
-                } else {
-                    "float->tiled"
-                };
-                info!("Window {} changed: {}", window.id, status);
-            }
-
             self.schedule_apply_widths().await?;
-            self.try_execute_autofill(ws_name, "window state changed").await?;
         }
+
+        // Always execute auto_fill at the end if enabled
+        self.try_execute_autofill(ws_name, "window opened or changed").await?;
 
         Ok(())
     }
