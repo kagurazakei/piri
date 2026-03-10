@@ -1,0 +1,10 @@
+/home/antonio/Templates/piri/target/release/deps/shellexpand-b29f9e728f8cc73e.d: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/strings.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/wtraits.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/funcs.rs
+
+/home/antonio/Templates/piri/target/release/deps/libshellexpand-b29f9e728f8cc73e.rlib: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/strings.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/wtraits.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/funcs.rs
+
+/home/antonio/Templates/piri/target/release/deps/libshellexpand-b29f9e728f8cc73e.rmeta: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/strings.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/wtraits.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/funcs.rs
+
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/lib.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/strings.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/wtraits.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shellexpand-3.1.2/src/funcs.rs:

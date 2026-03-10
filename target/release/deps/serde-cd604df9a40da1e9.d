@@ -1,0 +1,14 @@
+/home/antonio/Templates/piri/target/release/deps/serde-cd604df9a40da1e9.d: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/antonio/Templates/piri/target/release/build/serde-5402a2280649b125/out/private.rs
+
+/home/antonio/Templates/piri/target/release/deps/libserde-cd604df9a40da1e9.rlib: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/antonio/Templates/piri/target/release/build/serde-5402a2280649b125/out/private.rs
+
+/home/antonio/Templates/piri/target/release/deps/libserde-cd604df9a40da1e9.rmeta: /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/antonio/Templates/piri/target/release/build/serde-5402a2280649b125/out/private.rs
+
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/antonio/.local/share/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/antonio/Templates/piri/target/release/build/serde-5402a2280649b125/out/private.rs:
+
+# env-dep:OUT_DIR=/home/antonio/Templates/piri/target/release/build/serde-5402a2280649b125/out
